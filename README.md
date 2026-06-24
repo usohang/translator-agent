@@ -1,47 +1,111 @@
 # 문서 번역 에이전트 (Document Translation Agent)
 
-PDF·HWP·DOCX 등 문서 파일을 업로드하면 **사람 번역가 수준의 문맥 번역**으로 한글 문서를 생성하는 AI 번역 에이전트 프로젝트입니다.
+PDF·HWP·DOCX 등 문서 파일을 업로드하면 **Claude AI 기반 문맥 번역**으로 한글 DOCX를 생성하는 번역 에이전트입니다.
 
-## 핵심 특징
+## 주요 기능
 
-- **문맥 기반 번역**: 단순 기계 번역이 아닌 도메인·용어 일관성을 지키는 번역
-- **레이아웃 보존**: 제목/소제목 계층, 표, 그림, 문서 디자인 재현
-- **원문 추적성**: 번역본에서 원문 페이지를 즉시 확인할 수 있는 페이지 매핑
-- **웹 대시보드**: 업로드·진행률·미리보기·다운로드 통합 UI
+- **문맥 기반 2-pass 번역**: 초벌 번역 → Claude 검수 패스로 품질 보장
+- **레이아웃 보존**: 제목 계층·표·이미지·스타일 재현
+- **원문 추적**: 번역본에 `〔원문 p.N〕` 표기 + 페이지 매핑 표 첨부
+- **용어집**: 동일 문서 내 핵심 용어 일관성 유지
+- **웹 대시보드**: 드래그&드롭 업로드 → 실시간 진행률(SSE) → 다운로드
+
+## 아키텍처
+
+```
+[Next.js 대시보드]
+       │ 업로드/SSE/다운로드
+       ▼
+[FastAPI 백엔드]
+       │ 작업 생성
+       ▼
+[Celery Worker + Redis]
+       ▼
+PDF/HWP/DOCX → IR → Claude 번역 → DOCX 출력
+```
+
+## 빠른 시작 (Docker Compose)
+
+```bash
+# 1. 환경 변수 설정
+cp .env.example .env
+# .env 파일에서 ANTHROPIC_API_KEY 입력
+
+# 2. 전체 스택 실행
+docker compose up --build
+
+# 3. 브라우저에서 열기
+open http://localhost:3000
+```
+
+## 로컬 개발
+
+### 백엔드
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# Redis 실행 (별도 터미널)
+docker run -p 6379:6379 redis:7-alpine
+
+# FastAPI 서버
+uvicorn app.main:app --reload --port 8000
+
+# Celery 워커 (별도 터미널)
+celery -A app.jobs.celery_app worker --loglevel=info
+```
+
+### 프론트엔드
+
+```bash
+cd frontend
+npm install
+npm run dev   # http://localhost:3000
+```
+
+## 프로젝트 구조
+
+```
+├── backend/
+│   └── app/
+│       ├── models/ir.py          # IR 데이터 모델 (Pydantic)
+│       ├── parsers/              # PDF · HWP · DOCX → IR
+│       ├── translate/            # Claude API 번역 + 용어집
+│       ├── assemble/             # IR → DOCX 생성
+│       ├── pagemap/              # 원문↔번역본 페이지 매핑
+│       ├── jobs/                 # Celery 파이프라인
+│       └── api/routes.py         # FastAPI 엔드포인트
+├── frontend/src/
+│   ├── app/page.tsx              # 메인 대시보드
+│   ├── components/               # UploadZone · ProgressCard · JobList
+│   └── lib/api.ts                # API 클라이언트 (SSE 포함)
+├── docker-compose.yml
+├── .env.example                  # 환경 변수 템플릿
+└── 원문번역 에이전트_기획서.md    # 전체 설계 문서
+```
 
 ## 지원 포맷
 
-| 입력 | 출력 |
+| 입력 | 파서 |
 |------|------|
-| `.pdf`, `.hwp`, `.hwpx`, `.docx` | `.docx` (기본), `.pdf` (옵션) |
+| `.pdf` | PyMuPDF (fitz) |
+| `.hwp` / `.hwpx` | hwp-hwpx-parser → LibreOffice fallback |
+| `.docx` | python-docx |
+
+**출력**: `.docx` (기본) — 편집·재활용 최적화
 
 ## 기술 스택
 
 | 레이어 | 기술 |
 |--------|------|
-| 프론트엔드 | Next.js, React, Tailwind CSS, SSE |
+| 프론트엔드 | Next.js 14, React, Tailwind CSS, SSE |
 | 백엔드 API | Python FastAPI |
-| 작업 큐 | Celery/RQ + Redis |
-| PDF 파싱 | Docling, PyMuPDF, pdfplumber |
-| HWP/HWPX 파싱 | hwp-hwpx-parser, pyhwp |
-| DOCX 출력 | python-docx |
+| 작업 큐 | Celery + Redis |
 | 번역 엔진 | Anthropic Claude API |
+| DOCX 출력 | python-docx |
 
-## 프로젝트 문서
+## 설계 문서
 
-- [번역 에이전트 기획서](원문번역%20에이전트_기획서.md) — 전체 시스템 설계·파이프라인·데이터 모델
-
-## 개발 로드맵
-
-- **M1**: PDF → 번역 → DOCX 최소 파이프라인 (MVP)
-- **M2**: 표/이미지 보존, HWP/HWPX 지원, 용어집
-- **M3**: 웹 대시보드 완성 (실시간 진행률, 비교 뷰)
-- **M4**: OCR, PPTX, 번역 메모리 (선택)
-
-## 시작하기
-
-> 현재 기획 단계입니다. 구현은 [기획서](원문번역%20에이전트_기획서.md)의 M1부터 착수 권장.
-
-```bash
-# 추후 업데이트 예정
-```
+전체 시스템 설계·파이프라인·데이터 모델: [원문번역 에이전트_기획서.md](원문번역%20에이전트_기획서.md)

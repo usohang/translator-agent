@@ -27,15 +27,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# 업로드 / 처리 파일 (사용자 문서)
+# 업로드 / 처리 파일 (사용자 문서 — 런타임 생성)
 uploads/
+outputs/
 samples/
-output/
 tmp/
 *.pdf
 *.hwp
 *.hwpx
-*.docx
 
 # 캐시 / 빌드
 .cache/
