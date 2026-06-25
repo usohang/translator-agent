@@ -3,9 +3,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    anthropic_api_key: str = ""
-    claude_model_primary: str = "claude-sonnet-4-6"
-    claude_model_light: str = "claude-haiku-4-5-20251001"
+    google_api_key: str = ""
+    gemini_model_primary: str = "gemini-1.5-flash"
+    gemini_model_light: str = "gemini-1.5-flash"
 
     redis_url: str = "redis://localhost:6379/0"
 
@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     images_dir: str = "uploads/images"
 
     max_file_size_mb: int = 50
-    translation_batch_size: int = 5   # 한 번에 번역할 블록 수
-    max_context_blocks: int = 3        # 앞뒤 맥락 블록 수
+    translation_batch_size: int = 5
+    max_context_blocks: int = 3
 
     class Config:
         env_file = ".env"
